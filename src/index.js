@@ -12,6 +12,8 @@ var tools = require('./tools');
 var state = require('./state');
 var localization = require('./localization');
 require('./polyfill');
+var sendRequest = require('./reconfig-async-client');
+var Waypoint = require('./waypoint');
 
 var parsedOptions = links.parse(window.location.search.slice(1));
 var mergedOptions = L.extend(leafletOptions.defaultState, parsedOptions);
@@ -167,6 +169,73 @@ router._convertRoute = function(responseRoute) {
 
   return resp;
 };
+router.route = function(waypoints, callback, context, options) {
+  var timedOut = false,
+				wps = [],
+				url,
+				timer,
+				wp,
+				i;
+  console.log("TTTTTTTTT");
+  options = L.extend({}, this.options.routingOptions, options);
+	url = this.buildRouteUrl(waypoints, options);
+  var urlObj = new URL(url);
+  var endpoint = urlObj.pathname + urlObj.search + urlObj.hash;
+	if (this.options.requestParameters) {
+    url += L.Util.getParamString(this.options.requestParameters, url);
+	}
+
+  timer = setTimeout(function() {
+    timedOut = true;
+    callback.call(context || callback, {
+      status: -1,
+      message: 'OSRM request timed out.'
+    });
+  }, this.options.timeout);
+
+  for (i = 0; i < waypoints.length; i++) {
+    wp = waypoints[i];
+    wps.push(new Waypoint(wp.latLng, wp.name, wp.options));
+  }
+
+  sendRequest("osmr_backend", endpoint, {}, (resp) => {
+    var error = {};
+    clearTimeout(timer);
+    if (!timedOut) {
+      try {
+        //data = JSON.parse(resp.responseText);
+        try {
+          return this._routeDone(resp, wps, options, callback, context);
+        } catch (ex) {
+          error.status = -3;
+          error.message = ex.toString();
+        }
+      } catch (ex) {
+        error.status = -2;
+        error.message = 'Error parsing OSRM response: ' + ex.toString();
+      }
+      callback.call(context || callback, error);
+    }
+  }, (err) => {
+    var error = {};
+    var message = err.type + (err.target && err.target.status ? ' HTTP ' + err.target.status + ': ' + err.target.statusText : '');
+		if (err.responseText) {
+      try {
+        data = JSON.parse(err.responseText);
+        if (data.message)
+          message = data.message;
+      } catch (ex) {
+
+      }
+		}
+    error.message = 'HTTP request failed: ' + message;
+    error.url = url;
+    error.status = -1;
+    error.target = err;
+    callback.call(context || callback, error);
+  }, ["127.0.0.1:3300"], this.options.timeout);
+
+}
 var lrmControl = L.Routing.control(Object.assign(controlOptions, {
   router: router
 })).addTo(map);
