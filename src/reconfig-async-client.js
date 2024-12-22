@@ -103,7 +103,7 @@ function removeARAndChooseNextBestReplica(serviceName){
 }
 
 
-export default async function sendRequest(serviceName, endpoint, requestSpecs, callbackFunction, onErrorFunction, rcUrls, timeoutDuration=defaultTimeout){
+async function sendRequest(serviceName, endpoint, requestSpecs, callbackFunction, onErrorFunction, rcUrls, timeoutDuration=defaultTimeout){
     if(!ownIpAddr){
         ownIpAddr = await fetch("https://api.ipify.org/?format=string").then((resp) => resp.text());
         ownIpDetails = await fetch(`https://ipapi.co/${ownIpAddr}/json/`).then((resp) => resp.json());
@@ -124,7 +124,6 @@ export default async function sendRequest(serviceName, endpoint, requestSpecs, c
     var ctr = 0;
     var response = NO_ACTIVE_REPLICAS;
     while(!isRequestSent && ctr++<20){
-        console.log("HEre......");
         if(!latenciesMap.get(serviceName).has("bestAR") || latenciesMap.get(serviceName).get("bestAR") == null){
             onErrorFunction(response);
             break;
@@ -140,14 +139,11 @@ export default async function sendRequest(serviceName, endpoint, requestSpecs, c
                 },
                 signal: AbortSignal.timeout(timeoutDuration)
             });
-            console.log("dnvanfkrwnwnr");
             if (await resp.status != 200){
                 throw new Error(`Active Server ${bestAR} has crashed or not available for service ${serviceName}`);
             }
             response = await resp.json();
-            //respJson = JSON.parse(respText.substring(11));
             isRequestSent = true;
-            //response = successRequestMsg(respJson["QID"]);
             callbackFunction(response);
         }
         catch(error){
@@ -164,15 +160,11 @@ export default async function sendRequest(serviceName, endpoint, requestSpecs, c
 }
 
 async function initService(service){
-    //services.forEach((service) => {
         let serviceName = service.name;
         let rcUrls = service.rcUrls;
         let isLocal = service.isLocal;
 
-        console.log(serviceName);
-        console.log(rcUrls);
-        console.log(isLocal);
-
+        
         latenciesMap.set(serviceName, new Map());
 
         latenciesMap.get(serviceName).set("reconfigurators", rcUrls.map((x) => new InetSocketAddress(x.split(":")[0], x.split(":")[1])));
@@ -183,8 +175,6 @@ async function initService(service){
             latenciesMap.get(serviceName).set("intervalId", setInterval(function() { periodicallyCheckActiveARs(serviceName); }, CHECK_ACTIVE_ARs_DURATION));
         }
         console.log(latenciesMap);
-    //});
-    //return "Client has been initialized successfully"
 }
 async function closeClient(){
     latenciesMap.keys().forEach((serviceName) =>{
@@ -194,7 +184,4 @@ async function closeClient(){
     return "Client's operations closed successfully";
 }
 
-async function helloWorld(){
-    console.log("Hello World Motherfuckers!!!!!");
-}
-// module.exports = sendRequest;
+module.exports = sendRequest;
