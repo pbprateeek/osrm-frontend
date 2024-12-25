@@ -176,7 +176,6 @@ router.route = function(waypoints, callback, context, options) {
 				timer,
 				wp,
 				i;
-  console.log("TTTTTTTTT");
   options = L.extend({}, this.options.routingOptions, options);
 	url = this.buildRouteUrl(waypoints, options);
   var urlObj = new URL(url);
